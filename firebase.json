@@ -1,0 +1,32 @@
+{
+	"firestore": {
+		"rules": "firestore.rules",
+		"indexes": "firestore.indexes.json"
+	},
+	"emulators": {
+		"firestore": {
+			"port": 8080
+		},
+		"ui": {
+			"enabled": true
+		},
+		"singleProjectMode": true,
+		"hosting": {
+			"port": 5000
+		},
+		"auth": {
+			"port": 9099
+		}
+	},
+	"hosting": {
+		"predeploy": "npm run build",
+		"public": ".output/public",
+		"ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+		"rewrites": [
+			{
+				"source": "**",
+				"destination": "/index.html"
+			}
+		]
+	}
+}

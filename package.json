@@ -1,0 +1,37 @@
+{
+	"name": "solid-start-firebase-template",
+	"type": "module",
+	"scripts": {
+		"dev": "concurrently \"npm run dev:server\" \"npm run dev:firebase\" --names server,firebase",
+		"dev:server": "vinxi dev",
+		"dev:firebase": "firebase emulators:start --only firestore,hosting,auth",
+		"build": "vinxi build",
+		"start": "vinxi start",
+		"lint": "biome lint --write",
+		"format": "biome format --write",
+		"test": "concurrently \"npm run dev:firebase\" \"npm run test:vitest\" --names firebase,vitest --kill-others --success first",
+		"test:vitest": "wait-on http-get://localhost:8080 http-get://localhost:5000 && vitest"
+	},
+	"dependencies": {
+		"@solidjs/router": "^0.15.2",
+		"@solidjs/start": "^1.0.10",
+		"concurrently": "^9.1.0",
+		"firebase": "^11.1.0",
+		"solid-firebase": "^0.3.0",
+		"solid-js": "^1.9.3",
+		"vinxi": "^0.4.3",
+		"vite-plugin-solid": "^2.11.0"
+	},
+	"engines": {
+		"node": ">=20"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^1.9.4",
+		"@solidjs/testing-library": "^0.8.10",
+		"@testing-library/jest-dom": "^6.6.3",
+		"@testing-library/user-event": "^14.5.2",
+		"jsdom": "^25.0.1",
+		"vitest": "^2.1.8",
+		"wait-on": "^8.0.1"
+	}
+}
