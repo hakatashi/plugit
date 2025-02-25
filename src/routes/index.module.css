@@ -1,5 +1,6 @@
 ul.tasks {
-	width: 42rem;
+	width: 100%;
+	max-width: 42rem;
 	margin: 1rem auto;
 	list-style-type: none;
 	padding: 0;
@@ -9,4 +10,39 @@ li.task {
 	padding: 10px;
 	border: 1px solid #ccc;
 	margin-bottom: 10px;
+}
+
+.canvas {
+	width: 100vw;
+}
+
+.controls {
+	display: flex;
+	justify-content: center;
+	margin-top: 1rem;
+	text-align: center;
+}
+
+.param {
+	margin: 0 0.2rem;
+	flex: 1;
+}
+
+.control {
+	background: #f4f4f4;
+	border-radius: 1rem;
+	font-size: 4vmin;
+}
+
+.changeButton {
+	width: 100%;
+	height: 5rem;
+	border: none;
+	padding: 0.5rem 1rem;
+	border-radius: 1rem;
+	cursor: pointer;
+}
+
+.changeButton.selected {
+	background: #bebebe;
 }

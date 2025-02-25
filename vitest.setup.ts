@@ -9,7 +9,7 @@ fetchMock.mockImplementation((...args) => {
 			new Response(
 				JSON.stringify({
 					apiKey: 'fakeApiKey',
-					projectId: 'solid-start-firebase-template',
+					projectId: 'buttplugit',
 				}),
 			),
 		);
@@ -20,7 +20,7 @@ fetchMock.mockImplementation((...args) => {
 beforeEach(async () => {
 	// Reset firestore data
 	await originalFetch(
-		'http://localhost:8080/emulator/v1/projects/solid-start-firebase-template/databases/(default)/documents',
+		'http://localhost:8080/emulator/v1/projects/buttplugit/databases/(default)/documents',
 		{
 			method: 'DELETE',
 		},
