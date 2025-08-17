@@ -63,12 +63,13 @@ const Control: Component = () => {
 		[key in Exclude<BodyPart, 'mixed'>]: {
 			strength: number;
 			rotationSpeed: number;
+			rotationClockwise: boolean;
 		};
 	}>({
-		rightNipple: {strength: 0, rotationSpeed: 0},
-		leftNipple: {strength: 0, rotationSpeed: 0},
-		clitoris: {strength: 0, rotationSpeed: 0},
-		vagina: {strength: 0, rotationSpeed: 0},
+		rightNipple: {strength: 0, rotationSpeed: 0, rotationClockwise: true},
+		leftNipple: {strength: 0, rotationSpeed: 0, rotationClockwise: true},
+		clitoris: {strength: 0, rotationSpeed: 0, rotationClockwise: true},
+		vagina: {strength: 0, rotationSpeed: 0, rotationClockwise: true},
 	});
 
 	// Command history for debugging
@@ -112,6 +113,11 @@ const Control: Component = () => {
 			return newHistory.slice(0, 10); // Keep only last 10 commands
 		});
 	};
+
+	// Rotation direction timers for ABXY button mode
+	const [rotationTimers, setRotationTimers] = createSignal<{
+		[key in Exclude<BodyPart, 'mixed'>]?: ReturnType<typeof setInterval>;
+	}>({});
 
 	// Timers
 	let gamepadTimer: ReturnType<typeof setInterval> | undefined;
@@ -176,10 +182,11 @@ const Control: Component = () => {
 		bodyPart: Exclude<BodyPart, 'mixed'>,
 		strength: number,
 		rotationSpeed: number = 0,
+		rotationClockwise: boolean = true,
 	) => {
 		setExpectedDeviceState((prev) => ({
 			...prev,
-			[bodyPart]: {strength, rotationSpeed},
+			[bodyPart]: {strength, rotationSpeed, rotationClockwise},
 		}));
 	};
 
@@ -214,6 +221,15 @@ const Control: Component = () => {
 		] as Array<Exclude<BodyPart, 'mixed'>>) {
 			const motorMappings = mapping[bodyPart];
 			const state = currentState[bodyPart];
+
+			if (tick % 60 === 0) {
+				console.log(
+					`[control] ${bodyPart}: motor mappings ${JSON.stringify(motorMappings)}`,
+				);
+				console.log(
+					`[control] ${bodyPart}: current state ${JSON.stringify(state)}`,
+				);
+			}
 
 			if (!motorMappings || motorMappings.length === 0) continue;
 
@@ -256,7 +272,7 @@ const Control: Component = () => {
 						state.rotationSpeed,
 					);
 					deviceCommand.rotations[motorIndex].Clockwise =
-						state.rotationSpeed > 0;
+						state.rotationClockwise;
 					deviceCommand.commandLog.push({
 						bodyPart,
 						motorIndex,
@@ -308,13 +324,51 @@ const Control: Component = () => {
 		}
 	};
 
+	const startRotationTimer = (bodyPart: Exclude<BodyPart, 'mixed'>) => {
+		// Clear existing timer if any
+		const currentTimers = rotationTimers();
+		if (currentTimers[bodyPart]) {
+			clearInterval(currentTimers[bodyPart]);
+		}
+
+		// Start new timer that switches direction every 500ms
+		const timer = setInterval(() => {
+			setExpectedDeviceState((prev) => ({
+				...prev,
+				[bodyPart]: {
+					...prev[bodyPart],
+					rotationClockwise: !prev[bodyPart].rotationClockwise,
+				},
+			}));
+		}, 500);
+
+		// Update timers state
+		setRotationTimers((prev) => ({
+			...prev,
+			[bodyPart]: timer,
+		}));
+	};
+
+	const stopRotationTimer = (bodyPart: Exclude<BodyPart, 'mixed'>) => {
+		const currentTimers = rotationTimers();
+		if (currentTimers[bodyPart]) {
+			clearInterval(currentTimers[bodyPart]);
+			setRotationTimers((prev) => {
+				const newTimers = {...prev};
+				delete newTimers[bodyPart];
+				return newTimers;
+			});
+		}
+	};
+
 	const controlDevice = (
 		bodyPart: Exclude<BodyPart, 'mixed'>,
 		strength: number,
 		rotationSpeed: number = 0,
+		rotationClockwise: boolean = true,
 	) => {
 		// Update expected state
-		updateExpectedState(bodyPart, strength, rotationSpeed);
+		updateExpectedState(bodyPart, strength, rotationSpeed, rotationClockwise);
 		// Send accumulated commands to all devices
 		sendAllDeviceCommands('gamepad');
 	};
@@ -356,14 +410,6 @@ const Control: Component = () => {
 			] as Exclude<BodyPart, 'mixed'>;
 			const isPressed = currentButtonStates[i];
 			const wasPressed = prevStates[i] || false;
-			if (tick % 60 === 0) {
-				console.log(
-					`[control] ${bodyPart}: ${isPressed ? '🟢 Pressed' : '⚪ Released'}`,
-				);
-				console.log(
-					`[control] ${bodyPart} (prev): ${wasPressed ? '🟢 Pressed' : '⚪ Released'}`,
-				);
-			}
 
 			// Detect button press (not held)
 			if (isPressed && !wasPressed) {
@@ -384,6 +430,10 @@ const Control: Component = () => {
 							return newSet;
 						});
 						console.log(`Turned off always-on mode for ${bodyPart}`);
+						// Stop rotation timer when turning off always-on mode
+						stopRotationTimer(bodyPart);
+						// Stop the device
+						controlDevice(bodyPart, 0, 0, true);
 					} else {
 						// Single press - turn on always-on mode
 						setAlwaysOnMode((prev) => new Set(prev).add(bodyPart));
@@ -397,21 +447,35 @@ const Control: Component = () => {
 						return newTimes;
 					});
 				} else {
-					// Regular button press - activate device
+					// Regular button press - activate device with vibration and rotation
 					console.log(
 						`[control] Activating device for ${bodyPart} with strength ${globalStrength()}`,
 					);
-					controlDevice(bodyPart, globalStrength());
+					// Start vibration and rotation
+					controlDevice(bodyPart, globalStrength(), globalStrength(), true);
+					// Start rotation timer for direction switching
+					startRotationTimer(bodyPart);
 				}
 			} else if (!isPressed && wasPressed) {
 				// Button released - stop device if not in always-on mode
 				console.log(`[control] Deactivating device for ${bodyPart}`);
 				if (!alwaysOnMode().has(bodyPart)) {
-					controlDevice(bodyPart, 0);
+					controlDevice(bodyPart, 0, 0, true);
+					// Stop rotation timer when button is released
+					stopRotationTimer(bodyPart);
 				}
 			} else if (alwaysOnMode().has(bodyPart)) {
-				// Always-on mode - keep device active
-				controlDevice(bodyPart, globalStrength());
+				// Always-on mode - keep device active with rotation
+				controlDevice(
+					bodyPart,
+					globalStrength(),
+					globalStrength(),
+					expectedDeviceState()[bodyPart].rotationClockwise,
+				);
+				// Ensure rotation timer is running for always-on mode
+				if (!rotationTimers()[bodyPart]) {
+					startRotationTimer(bodyPart);
+				}
 			}
 		}
 
@@ -421,20 +485,34 @@ const Control: Component = () => {
 			y: gamepad.axes[1] || 0,
 		};
 
-		// Calculate rotation speed and direction from stick input
-		const stickMagnitude = Math.sqrt(
-			leftStick.x * leftStick.x + leftStick.y * leftStick.y,
-		);
-		const rotationDirection = Math.atan2(leftStick.y, leftStick.x);
+		// Only allow stick control if button-based rotation is not active
+		const leftNippleButtonActive =
+			currentButtonStates[2] || // X button pressed
+			alwaysOnMode().has('leftNipple') ||
+			rotationTimers()['leftNipple']; // Has active rotation timer
+		const rightNippleButtonActive =
+			currentButtonStates[3] || // Y button pressed
+			alwaysOnMode().has('rightNipple') ||
+			rotationTimers()['rightNipple']; // Has active rotation timer
 
-		if (stickMagnitude > 0.1) {
-			// Dead zone
-			const rotationSpeed = stickMagnitude * (rotationDirection > 0 ? -1 : 1);
-			controlDevice('leftNipple', 0, rotationSpeed);
-			controlDevice('rightNipple', 0, rotationSpeed);
-		} else {
-			controlDevice('leftNipple', 0, 0);
-			controlDevice('rightNipple', 0, 0);
+		if (!leftNippleButtonActive && !rightNippleButtonActive) {
+			// Stick control only active when no button control is active
+
+			// Calculate rotation speed and direction from stick input
+			const stickMagnitude = Math.sqrt(
+				leftStick.x * leftStick.x + leftStick.y * leftStick.y,
+			);
+			const rotationDirection = Math.atan2(leftStick.y, leftStick.x);
+
+			if (stickMagnitude > 0.1) {
+				// Dead zone
+				const rotationSpeed = stickMagnitude * (rotationDirection > 0 ? -1 : 1);
+				controlDevice('leftNipple', 0, rotationSpeed);
+				controlDevice('rightNipple', 0, rotationSpeed);
+			} else {
+				controlDevice('leftNipple', 0, 0);
+				controlDevice('rightNipple', 0, 0);
+			}
 		}
 
 		// Handle trigger for strength adjustment
@@ -500,6 +578,13 @@ const Control: Component = () => {
 		}
 		if (deviceSyncTimer) {
 			clearInterval(deviceSyncTimer);
+		}
+		// Clear all rotation timers
+		const currentTimers = rotationTimers();
+		for (const timer of Object.values(currentTimers)) {
+			if (timer) {
+				clearInterval(timer);
+			}
 		}
 		window.removeEventListener('gamepadconnected', detectGamepad);
 		window.removeEventListener('gamepaddisconnected', detectGamepad);
@@ -640,6 +725,11 @@ const Control: Component = () => {
 										<br />
 										Rotation:{' '}
 										{expectedDeviceState()[bodyPart].rotationSpeed.toFixed(3)}
+										<br />
+										Direction:{' '}
+										{expectedDeviceState()[bodyPart].rotationClockwise
+											? '🔄 CW'
+											: '↩️ CCW'}
 									</div>
 								)}
 							</For>
