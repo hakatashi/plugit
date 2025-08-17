@@ -60,7 +60,7 @@ const Control: Component = () => {
 
 	// Expected device state for periodic sync
 	const [expectedDeviceState, setExpectedDeviceState] = createSignal<{
-		[key in BodyPart]: {
+		[key in Exclude<BodyPart, 'mixed'>]: {
 			strength: number;
 			rotationSpeed: number;
 		};
@@ -114,8 +114,8 @@ const Control: Component = () => {
 	};
 
 	// Timers
-	let gamepadTimer: number | undefined;
-	let deviceSyncTimer: number | undefined;
+	let gamepadTimer: ReturnType<typeof setInterval> | undefined;
+	let deviceSyncTimer: ReturnType<typeof setInterval> | undefined;
 
 	const onDeviceAdded = (device: ButtplugClientDevice) => {
 		console.log(`Device added: ${device.name}`);
@@ -211,7 +211,7 @@ const Control: Component = () => {
 			'leftNipple',
 			'clitoris',
 			'vagina',
-		] as BodyPart[]) {
+		] as Array<Exclude<BodyPart, 'mixed'>>) {
 			const motorMappings = mapping[bodyPart];
 			const state = currentState[bodyPart];
 
@@ -288,7 +288,11 @@ const Control: Component = () => {
 
 			// Send rotation command if any rotators are mapped
 			if (device.rotateAttributes.length > 0) {
-				device.rotate(commands.rotations);
+				device.rotate(
+					commands.rotations.map(
+						(r) => [r.Speed, r.Clockwise] as [number, boolean],
+					),
+				);
 
 				// Log rotation command
 				addToCommandHistory(
@@ -349,7 +353,7 @@ const Control: Component = () => {
 		for (let i = 0; i < Math.min(4, gamepad.buttons.length); i++) {
 			const bodyPart = BUTTON_MAPPING[
 				i as keyof typeof BUTTON_MAPPING
-			] as BodyPart;
+			] as Exclude<BodyPart, 'mixed'>;
 			const isPressed = currentButtonStates[i];
 			const wasPressed = prevStates[i] || false;
 			if (tick % 60 === 0) {
@@ -613,12 +617,9 @@ const Control: Component = () => {
 						<div class={styles.debugGrid}>
 							<For
 								each={
-									[
-										'rightNipple',
-										'leftNipple',
-										'clitoris',
-										'vagina',
-									] as BodyPart[]
+									['rightNipple', 'leftNipple', 'clitoris', 'vagina'] as Array<
+										Exclude<BodyPart, 'mixed'>
+									>
 								}
 							>
 								{(bodyPart) => (
@@ -859,7 +860,9 @@ const Control: Component = () => {
 				<div class={styles.deviceGrid}>
 					<For
 						each={
-							['rightNipple', 'leftNipple', 'clitoris', 'vagina'] as BodyPart[]
+							['rightNipple', 'leftNipple', 'clitoris', 'vagina'] as Array<
+								Exclude<BodyPart, 'mixed'>
+							>
 						}
 					>
 						{(bodyPart) => (
