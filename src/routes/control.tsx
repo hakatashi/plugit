@@ -41,7 +41,7 @@ const Control: Component = () => {
 	const [deviceMapping, setDeviceMapping] = createSignal<DeviceMapping>({});
 	const [gamepadConnected, setGamepadConnected] = createSignal(false);
 	const [gamepadIndex, setGamepadIndex] = createSignal<number>(-1);
-	const [globalStrength, setGlobalStrength] = createSignal(0.5);
+	const [globalStrength, setGlobalStrength] = createSignal(0.2);
 	const [alwaysOnMode, setAlwaysOnMode] = createSignal<Set<BodyPart>>(
 		new Set(),
 	);
@@ -49,6 +49,10 @@ const Control: Component = () => {
 	// Previous button states to detect double presses
 	const [prevButtonStates, setPrevButtonStates] = createSignal<boolean[]>([]);
 	const [buttonPressTimes, setButtonPressTimes] = createSignal<number[]>([]);
+
+	// Previous stick state for strength adjustment
+	const [prevStickUp, setPrevStickUp] = createSignal(false);
+	const [prevStickDown, setPrevStickDown] = createSignal(false);
 
 	// Debug state for gamepad
 	const [gamepadState, setGamepadState] = createSignal({
@@ -221,15 +225,6 @@ const Control: Component = () => {
 		] as Array<Exclude<BodyPart, 'mixed'>>) {
 			const motorMappings = mapping[bodyPart];
 			const state = currentState[bodyPart];
-
-			if (tick % 60 === 0) {
-				console.log(
-					`[control] ${bodyPart}: motor mappings ${JSON.stringify(motorMappings)}`,
-				);
-				console.log(
-					`[control] ${bodyPart}: current state ${JSON.stringify(state)}`,
-				);
-			}
 
 			if (!motorMappings || motorMappings.length === 0) continue;
 
@@ -479,55 +474,34 @@ const Control: Component = () => {
 			}
 		}
 
-		// Handle stick rotation for nipple devices
+		// Get left stick for trigger strength adjustment
 		const leftStick = {
 			x: gamepad.axes[0] || 0,
 			y: gamepad.axes[1] || 0,
 		};
 
-		// Only allow stick control if button-based rotation is not active
-		const leftNippleButtonActive =
-			currentButtonStates[2] || // X button pressed
-			alwaysOnMode().has('leftNipple') ||
-			rotationTimers()['leftNipple']; // Has active rotation timer
-		const rightNippleButtonActive =
-			currentButtonStates[3] || // Y button pressed
-			alwaysOnMode().has('rightNipple') ||
-			rotationTimers()['rightNipple']; // Has active rotation timer
-
-		if (!leftNippleButtonActive && !rightNippleButtonActive) {
-			// Stick control only active when no button control is active
-
-			// Calculate rotation speed and direction from stick input
-			const stickMagnitude = Math.sqrt(
-				leftStick.x * leftStick.x + leftStick.y * leftStick.y,
-			);
-			const rotationDirection = Math.atan2(leftStick.y, leftStick.x);
-
-			if (stickMagnitude > 0.1) {
-				// Dead zone
-				const rotationSpeed = stickMagnitude * (rotationDirection > 0 ? -1 : 1);
-				controlDevice('leftNipple', 0, rotationSpeed);
-				controlDevice('rightNipple', 0, rotationSpeed);
-			} else {
-				controlDevice('leftNipple', 0, 0);
-				controlDevice('rightNipple', 0, 0);
-			}
-		}
-
 		// Handle trigger for strength adjustment
 		const triggerPressed =
 			gamepad.buttons[6]?.pressed || gamepad.buttons[7]?.pressed;
 		if (triggerPressed) {
-			// Check for stick up press for strength adjustment
+			// Check for stick up/down press for strength adjustment
 			const stickUp = leftStick.y < -0.8;
-			const stickWasUp = prevStates.length > 0; // Simplified state tracking
+			const stickDown = leftStick.y > 0.8;
+			const stickWasUp = prevStickUp();
+			const stickWasDown = prevStickDown();
 
 			if (stickUp && !stickWasUp) {
 				setGlobalStrength((prev) => Math.min(1, prev + 0.1));
 				console.log(`Strength increased to ${globalStrength()}`);
+			} else if (stickDown && !stickWasDown) {
+				setGlobalStrength((prev) => Math.max(0, prev - 0.1));
+				console.log(`Strength decreased to ${globalStrength()}`);
 			}
 		}
+
+		// Update previous stick states
+		setPrevStickUp(leftStick.y < -0.8);
+		setPrevStickDown(leftStick.y > 0.8);
 
 		setPrevButtonStates(currentButtonStates);
 	};
@@ -1037,15 +1011,15 @@ const Control: Component = () => {
 						<li>
 							<strong>Y Button:</strong> Right Nipple
 						</li>
-						<li>
-							<strong>Left Stick Rotation:</strong> Both nipple device rotation
-						</li>
 					</ul>
 
 					<h3>Special Operations (with Trigger):</h3>
 					<ul class={styles.controlsList}>
 						<li>
 							<strong>Trigger + Stick Up:</strong> Increase global strength
+						</li>
+						<li>
+							<strong>Trigger + Stick Down:</strong> Decrease global strength
 						</li>
 						<li>
 							<strong>Trigger + Button (1x):</strong> Enable always-on mode
