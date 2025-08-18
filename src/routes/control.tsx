@@ -28,10 +28,10 @@ type DeviceMapping = {
 
 // Gamepad button mapping
 const BUTTON_MAPPING = {
-	0: 'clitoris', // A button
-	1: 'vagina', // B button
-	2: 'leftNipple', // X button
-	3: 'rightNipple', // Y button
+	3: 'clitoris',
+	4: 'vagina',
+	11: 'leftNipple',
+	7: 'rightNipple',
 } as const;
 
 const Control: Component = () => {
@@ -399,22 +399,23 @@ const Control: Component = () => {
 		});
 
 		// Check for button presses
-		for (let i = 0; i < Math.min(4, gamepad.buttons.length); i++) {
+		for (const buttonIndex of [3, 4, 7, 11]) {
+			if (buttonIndex >= gamepad.buttons.length) continue;
+
 			const bodyPart = BUTTON_MAPPING[
-				i as keyof typeof BUTTON_MAPPING
+				buttonIndex as keyof typeof BUTTON_MAPPING
 			] as Exclude<BodyPart, 'mixed'>;
-			const isPressed = currentButtonStates[i];
-			const wasPressed = prevStates[i] || false;
+			const isPressed = currentButtonStates[buttonIndex];
+			const wasPressed = prevStates[buttonIndex] || false;
 
 			// Detect button press (not held)
 			if (isPressed && !wasPressed) {
-				const triggerPressed =
-					gamepad.buttons[6]?.pressed || gamepad.buttons[7]?.pressed; // L2/R2 triggers
+				const triggerPressed = gamepad.buttons[0]?.pressed; // Button 0 trigger
 
 				if (triggerPressed) {
 					// Special trigger mode operations
 					const pressTimes = buttonPressTimes();
-					const lastPressTime = pressTimes[i] || 0;
+					const lastPressTime = pressTimes[buttonIndex] || 0;
 					const timeSinceLastPress = currentTime - lastPressTime;
 
 					if (timeSinceLastPress < 500) {
@@ -438,7 +439,7 @@ const Control: Component = () => {
 					// Update press times
 					setButtonPressTimes((prev) => {
 						const newTimes = [...prev];
-						newTimes[i] = currentTime;
+						newTimes[buttonIndex] = currentTime;
 						return newTimes;
 					});
 				} else {
@@ -481,8 +482,7 @@ const Control: Component = () => {
 		};
 
 		// Handle trigger for strength adjustment
-		const triggerPressed =
-			gamepad.buttons[6]?.pressed || gamepad.buttons[7]?.pressed;
+		const triggerPressed = gamepad.buttons[0]?.pressed;
 		if (triggerPressed) {
 			// Check for stick up/down press for strength adjustment
 			const stickUp = leftStick.y < -0.8;
@@ -603,34 +603,24 @@ const Control: Component = () => {
 						<h3>Buttons:</h3>
 						<div class={styles.debugGrid}>
 							<div class={styles.debugItem}>
-								A (Clitoris):{' '}
+								Button 0 (Trigger):{' '}
 								{gamepadState().buttons[0] ? '🟢 Pressed' : '⚪ Released'}
 							</div>
 							<div class={styles.debugItem}>
-								B (Vagina):{' '}
-								{gamepadState().buttons[1] ? '🟢 Pressed' : '⚪ Released'}
-							</div>
-							<div class={styles.debugItem}>
-								X (Left Nipple):{' '}
-								{gamepadState().buttons[2] ? '🟢 Pressed' : '⚪ Released'}
-							</div>
-							<div class={styles.debugItem}>
-								Y (Right Nipple):{' '}
+								Button 3 (Clitoris):{' '}
 								{gamepadState().buttons[3] ? '🟢 Pressed' : '⚪ Released'}
 							</div>
 							<div class={styles.debugItem}>
-								L1: {gamepadState().buttons[4] ? '🟢 Pressed' : '⚪ Released'}
+								Button 4 (Vagina):{' '}
+								{gamepadState().buttons[4] ? '🟢 Pressed' : '⚪ Released'}
 							</div>
 							<div class={styles.debugItem}>
-								R1: {gamepadState().buttons[5] ? '🟢 Pressed' : '⚪ Released'}
-							</div>
-							<div class={styles.debugItem}>
-								L2 (Trigger):{' '}
-								{gamepadState().buttons[6] ? '🟢 Pressed' : '⚪ Released'}
-							</div>
-							<div class={styles.debugItem}>
-								R2 (Trigger):{' '}
+								Button 7 (Right Nipple):{' '}
 								{gamepadState().buttons[7] ? '🟢 Pressed' : '⚪ Released'}
+							</div>
+							<div class={styles.debugItem}>
+								Button 11 (Left Nipple):{' '}
+								{gamepadState().buttons[11] ? '🟢 Pressed' : '⚪ Released'}
 							</div>
 						</div>
 
@@ -1000,32 +990,32 @@ const Control: Component = () => {
 					<h3>Basic Controls:</h3>
 					<ul class={styles.controlsList}>
 						<li>
-							<strong>A Button:</strong> Clitoris
+							<strong>Button 3:</strong> Clitoris
 						</li>
 						<li>
-							<strong>B Button:</strong> Vagina
+							<strong>Button 4:</strong> Vagina
 						</li>
 						<li>
-							<strong>X Button:</strong> Left Nipple
+							<strong>Button 11:</strong> Left Nipple
 						</li>
 						<li>
-							<strong>Y Button:</strong> Right Nipple
+							<strong>Button 7:</strong> Right Nipple
 						</li>
 					</ul>
 
-					<h3>Special Operations (with Trigger):</h3>
+					<h3>Special Operations (with Button 0 Trigger):</h3>
 					<ul class={styles.controlsList}>
 						<li>
-							<strong>Trigger + Stick Up:</strong> Increase global strength
+							<strong>Button 0 + Stick Up:</strong> Increase global strength
 						</li>
 						<li>
-							<strong>Trigger + Stick Down:</strong> Decrease global strength
+							<strong>Button 0 + Stick Down:</strong> Decrease global strength
 						</li>
 						<li>
-							<strong>Trigger + Button (1x):</strong> Enable always-on mode
+							<strong>Button 0 + Button (1x):</strong> Enable always-on mode
 						</li>
 						<li>
-							<strong>Trigger + Button (2x):</strong> Disable always-on mode
+							<strong>Button 0 + Button (2x):</strong> Disable always-on mode
 						</li>
 					</ul>
 				</div>
